@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e293b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ウォッチリスト＆プランナー">
+    <title>ウォッチリスト & トリッププランナー v3.0</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateX(30px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        @keyframes shimmer {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+        .fade-in { animation: fadeSlideIn 0.35s ease-out; }
+        .toast-in { animation: toastIn 0.3s ease-out; }
+        .spinner { animation: spin 0.8s linear infinite; display: inline-block; }
+        .shimmer { animation: shimmer 1.5s infinite; }
+        .card-hover { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+        .card-hover:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .chip { transition: all 0.15s ease; cursor: pointer; }
+        ::-webkit-scrollbar { height: 4px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // ---- アイコン ----
+        const Film = (p) => <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="22" y2="7"/><line x1="2" y1="17" x2="22" y2="17"/></svg>;
+        const MapIcon = (p) => <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><polygon points="3 6 15 3 21 6 21 18 9 21 3 18 3 6"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="6" x2="15" y2="18"/></svg>;
+        const MapPin = (p) => <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>;
+        const Plus = (p) => <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
+        const Trash2 = (p) => <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>;
+        const Sparkles = (p) => <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>;
+        const Check = (p) => <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" {...p}><polyline points="20 6 9 17 4 12"/></svg>;
+        const ChevronDown = (p) => <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><polyline points="6 9 12 15 18 9"/></svg>;
+        const Ticket = (p) => <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="M2 9a3 3 0 1 0 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 1 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/></svg>;
+        const Tv = (p) => <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>;
+        const X = (p) => <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+        const AlertCircle = (p) => <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
+
+        // ---- ストリーミングサービスのバッジ配色 ----
+        const platformStyle = (name) => {
+            const n = name.toLowerCase();
+            if (n.includes('netflix')) return { bg: '#E50914', color: '#fff' };
+            if (n.includes('prime') || n.includes('amazon')) return { bg: '#00A8E1', color: '#fff' };
+            if (n.includes('hulu')) return { bg: '#1CE783', color: '#083815' };
+            if (n.includes('disney')) return { bg: '#113CCF', color: '#fff' };
+            if (n.includes('u-next') || n.includes('unext')) return { bg: '#1A1A1A', color: '#fff' };
+            if (n.includes('dアニメ') || n.includes('danime')) return { bg: '#FF6600', color: '#fff' };
+            if (n.includes('abema')) return { bg: '#00D4B4', color: '#083815' };
+            return { bg: '#64748b', color: '#fff' };
+        };
+
+        function WatchlistTravelApp() {
+            const [activeTab, setActiveTab] = useState('watchlist');
+            const [watchlist, setWatchlist] = useState(() => {
+                const saved = localStorage.getItem('watchlist');
+                return saved ? JSON.parse(saved) : [];
+            });
+            const [places, setPlaces] = useState(() => {
+                const saved = localStorage.getItem('places');
+                return saved ? JSON.parse(saved) : [];
+            });
+            const [selectedPlaces, setSelectedPlaces] = useState([]);
+            const [aiPlan, setAiPlan] = useState(null);
+            const [loadingAi, setLoadingAi] = useState(false);
+            const [recommendations, setRecommendations] = useState(() => {
+                const saved = localStorage.getItem('recommendations');
+                return saved ? JSON.parse(saved) : null;
+            });
+            const [showRecommendations, setShowRecommendations] = useState(false);
+
+            const [newTitle, setNewTitle] = useState('');
+            const [newType, setNewType] = useState('movie');
+            const [newPlace, setNewPlace] = useState('');
+            const [newPlaceLat, setNewPlaceLat] = useState('');
+            const [newPlaceLng, setNewPlaceLng] = useState('');
+
+            const [expandedItemId, setExpandedItemId] = useState(null);
+            const [bookDetails, setBookDetails] = useState({});
+            const [searchIsbn, setSearchIsbn] = useState('');
+            const [loadingBook, setLoadingBook] = useState({});
+
+            // サブスク情報
+            const [subInfo, setSubInfo] = useState(() => {
+                const saved = localStorage.getItem('subInfo');
+                return saved ? JSON.parse(saved) : {};
+            });
+            const [loadingSub, setLoadingSub] = useState({});
+
+            // フィルター
+            const [filterType, setFilterType] = useState('all');
+            const [filterWatched, setFilterWatched] = useState('all');
+
+            // トースト通知
+            const [toasts, setToasts] = useState([]);
+
+            useEffect(() => { localStorage.setItem('watchlist', JSON.stringify(watchlist)); }, [watchlist]);
+            useEffect(() => { localStorage.setItem('places', JSON.stringify(places)); }, [places]);
+            useEffect(() => { localStorage.setItem('subInfo', JSON.stringify(subInfo)); }, [subInfo]);
+
+            const addToast = (message, type = 'info') => {
+                const id = Date.now() + Math.random();
+                setToasts(prev => [...prev, { id, message, type }]);
+                setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
+            };
+
+            // ---- 本の情報取得（OpenBD API） ----
+            const fetchBookInfo = async (isbn) => {
+                if (!isbn) return;
+                setLoadingBook(prev => ({ ...prev, [isbn]: true }));
+                try {
+                    const response = await fetch(`https://api.openbd.jp/v1/get?isbn=${isbn}`);
+                    const data = await response.json();
+                    if (data && data[0]) {
+                        const book = data[0].summary;
+                        setBookDetails(prev => ({
+                            ...prev,
+                            [isbn]: {
+                                title: book.title, author: book.author, publisher: book.publisher,
+                                pubdate: book.pubdate, description: book.description, cover: book.cover
+                            }
+                        }));
+                        addToast('本の情報を取得しました', 'success');
+                    } else {
+                        addToast('情報が見つかりませんでした', 'error');
+                    }
+                } catch (error) {
+                    addToast('本の情報取得に失敗しました', 'error');
+                }
+                setLoadingBook(prev => ({ ...prev, [isbn]: false }));
+            };
+
+            // ---- 映画館検索（Google検索を新しいタブで開く） ----
+            const searchTheaters = (title) => {
+                const query = encodeURIComponent(`${title} 映画館 上映情報`);
+                window.open(`https://www.google.com/search?q=${query}`, '_blank');
+                addToast('上映情報の検索を開きました', 'info');
+            };
+
+            // ---- サブスク配信状況チェック（AI推定） ----
+            const checkSubscription = async (item) => {
+                setLoadingSub(prev => ({ ...prev, [item.id]: true }));
+                try {
+                    const response = await fetch('https://api.anthropic.com/v1/messages', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: 'claude-sonnet-4-6',
+                            max_tokens: 500,
+                            messages: [{
+                                role: 'user',
+                                content: `「${item.title}」（${item.type === 'movie' ? '映画' : item.type === 'anime' ? 'アニメ' : item.type === 'series' ? 'ドラマシリーズ' : '作品'}）は日本のどの主要動画配信サービスで視聴できる可能性が高いですか？
+Netflix, Amazon Prime Video, Hulu, Disney+, U-NEXT, dアニメストア, ABEMA の中から可能性が高いものを挙げてください。確実な情報でない場合はジャンルや配給元から推測しても構いません。
+
+以下のJSON形式のみで返してください:
+{"platforms": ["候補1", "候補2"], "note": "確実性についての一言（例：配信状況は変動するため最新情報は各サービスでご確認ください）"}`
+                            }]
+                        })
+                    });
+                    const data = await response.json();
+                    if (data.content && data.content[0] && data.content[0].text) {
+                        const jsonText = data.content[0].text.replace(/```json|```/g, '').trim();
+                        const info = JSON.parse(jsonText);
+                        setSubInfo(prev => ({ ...prev, [item.id]: info }));
+                        addToast('配信情報を取得しました', 'success');
+                    }
+                } catch (error) {
+                    addToast('配信情報の取得に失敗しました。APIキーをご確認ください', 'error');
+                }
+                setLoadingSub(prev => ({ ...prev, [item.id]: false }));
+            };
+
+            const searchSubscriptionWeb = (title) => {
+                const query = encodeURIComponent(`${title} 配信 どこで見れる`);
+                window.open(`https://www.google.com/search?q=${query}`, '_blank');
+            };
+
+            const addToWatchlist = () => {
+                if (newTitle.trim()) {
+                    setWatchlist([...watchlist, {
+                        id: Date.now(), title: newTitle, type: newType,
+                        date: new Date().toLocaleDateString('ja-JP'), watched: false
+                    }]);
+                    setNewTitle('');
+                    addToast('リストに追加しました', 'success');
+                } else {
+                    addToast('タイトルを入力してください', 'error');
+                }
+            };
+
+            const toggleWatched = (id) => {
+                setWatchlist(watchlist.map(item => item.id === id ? { ...item, watched: !item.watched } : item));
+            };
+
+            const removeFromWatchlist = (id) => {
+                setWatchlist(watchlist.filter(item => item.id !== id));
+                addToast('削除しました', 'info');
+            };
+
+            const addPlace = () => {
+                if (newPlace.trim() && newPlaceLat && newPlaceLng) {
+                    setPlaces([...places, {
+                        id: Date.now(), name: newPlace, lat: parseFloat(newPlaceLat), lng: parseFloat(newPlaceLng)
+                    }]);
+                    setNewPlace(''); setNewPlaceLat(''); setNewPlaceLng('');
+                    addToast('場所を追加しました', 'success');
+                } else {
+                    addToast('すべての項目を入力してください', 'error');
+                }
+            };
+
+            const removePlace = (id) => {
+                setPlaces(places.filter(place => place.id !== id));
+                setSelectedPlaces(selectedPlaces.filter(pid => pid !== id));
+            };
+
+            const togglePlaceSelection = (id) => {
+                setSelectedPlaces(selectedPlaces.includes(id) ? selectedPlaces.filter(pid => pid !== id) : [...selectedPlaces, id]);
+            };
+
+            const generateAiPlan = async () => {
+                if (selectedPlaces.length < 2) { addToast('2つ以上の場所を選択してください', 'error'); return; }
+                setLoadingAi(true);
+                const selectedData = places.filter(p => selectedPlaces.includes(p.id));
+                try {
+                    const response = await fetch('https://api.anthropic.com/v1/messages', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: 'claude-sonnet-4-6', max_tokens: 1500,
+                            messages: [{
+                                role: 'user',
+                                content: `以下の場所をまわる最適な旅行プランを作成してください。\n\n場所:\n${selectedData.map((p, i) => `${i + 1}. ${p.name} (緯度: ${p.lat}, 経度: ${p.lng})`).join('\n')}\n\n以下のJSON形式のみで返してください:\n{"title": "プランのタイトル", "recommendation": "全体の推奨ルートと理由", "itinerary": [{"order": 1, "place": "場所名", "stayTime": "推奨滞在時間", "tips": "コツ"}], "totalTime": "総所要時間", "notes": "アドバイス"}`
+                            }]
+                        })
+                    });
+                    const data = await response.json();
+                    if (data.content && data.content[0] && data.content[0].text) {
+                        const jsonText = data.content[0].text.replace(/```json|```/g, '').trim();
+                        setAiPlan(JSON.parse(jsonText));
+                        addToast('プランを生成しました', 'success');
+                    }
+                } catch (error) {
+                    addToast('AI計画の生成に失敗しました', 'error');
+                }
+                setLoadingAi(false);
+            };
+
+            const generateRecommendations = async () => {
+                setLoadingAi(true);
+                try {
+                    const response = await fetch('https://api.anthropic.com/v1/messages', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: 'claude-sonnet-4-6', max_tokens: 1000,
+                            messages: [{
+                                role: 'user',
+                                content: `最新の映画と本のおすすめを提案してください。以下のJSON形式のみで返してください:\n{"movies": [{"title": "タイトル", "year": 2024, "description": "説明"}], "books": [{"title": "タイトル", "author": "著者", "description": "説明"}]}`
+                            }]
+                        })
+                    });
+                    const data = await response.json();
+                    if (data.content && data.content[0] && data.content[0].text) {
+                        const jsonText = data.content[0].text.replace(/```json|```/g, '').trim();
+                        const recs = JSON.parse(jsonText);
+                        setRecommendations(recs);
+                        localStorage.setItem('recommendations', JSON.stringify(recs));
+                        setShowRecommendations(true);
+                        addToast('おすすめを取得しました', 'success');
+                    }
+                } catch (error) {
+                    addToast('おすすめ生成に失敗しました', 'error');
+                }
+                setLoadingAi(false);
+            };
+
+            // ---- フィルタ適用 ----
+            const filteredWatchlist = watchlist.filter(item => {
+                if (filterType !== 'all' && item.type !== filterType) return false;
+                if (filterWatched === 'watched' && !item.watched) return false;
+                if (filterWatched === 'unwatched' && item.watched) return false;
+                return true;
+            });
+            const watchedCount = watchlist.filter(i => i.watched).length;
+            const progressPct = watchlist.length ? Math.round((watchedCount / watchlist.length) * 100) : 0;
+
+            const typeLabel = { movie: '🎬 映画', book: '📚 本', anime: '🎨 アニメ', series: '📺 ドラマ' };
+            const typeChips = [
+                { id: 'all', label: 'すべて' }, { id: 'movie', label: '🎬 映画' },
+                { id: 'book', label: '📚 本' }, { id: 'anime', label: '🎨 アニメ' }, { id: 'series', label: '📺 ドラマ' }
+            ];
+
+            // ==================== ウォッチリストタブ ====================
+            const renderWatchlist = () => (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {/* 追加フォーム */}
+                    <div className="card-hover" style={{ background: 'white', borderRadius: '0.75rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', padding: '1rem' }}>
+                        <h2 style={{ fontSize: '1.05rem', fontWeight: 'bold', margin: '0 0 0.75rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#1e293b' }}>
+                            <Plus style={{ width: '1.1rem', height: '1.1rem' }} /> 追加
+                        </h2>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <input type="text" value={newTitle} onChange={(e) => setNewTitle(e.target.value)}
+                                placeholder="映画や本のタイトル" onKeyPress={(e) => e.key === 'Enter' && addToWatchlist()}
+                                style={{ flex: 1, padding: '0.6rem 0.75rem', border: '1px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.95rem' }} />
+                            <select value={newType} onChange={(e) => setNewType(e.target.value)}
+                                style={{ padding: '0.6rem', border: '1px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.9rem' }}>
+                                <option value="movie">映画</option><option value="book">本</option>
+                                <option value="anime">アニメ</option><option value="series">ドラマ</option>
+                            </select>
+                        </div>
+                        <button onClick={addToWatchlist} style={{
+                            width: '100%', marginTop: '0.6rem', background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                            color: 'white', fontWeight: 600, padding: '0.6rem', borderRadius: '0.5rem', border: 'none', cursor: 'pointer'
+                        }}>追加する</button>
+                    </div>
+
+                    {/* おすすめボタン */}
+                    <button onClick={generateRecommendations} disabled={loadingAi} style={{
+                        background: 'linear-gradient(135deg, #f59e0b, #ec4899)', color: 'white', fontWeight: 'bold',
+                        padding: '0.8rem', borderRadius: '0.75rem', border: 'none', cursor: loadingAi ? 'default' : 'pointer',
+                        opacity: loadingAi ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem'
+                    }}>
+                        {loadingAi ? <span className="spinner">⏳</span> : <Sparkles style={{ width: '1.1rem', height: '1.1rem' }} />}
+                        {loadingAi ? 'おすすめを作成中...' : '新作のおすすめを見る'}
+                    </button>
+
+                    {showRecommendations && recommendations && (
+                        <div className="fade-in" style={{ background: 'linear-gradient(135deg, #fef9c3, #fce7f3)', borderRadius: '0.75rem', padding: '1rem', border: '1px solid #fbbf24', position: 'relative' }}>
+                            <button onClick={() => setShowRecommendations(false)} style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', color: '#78350f' }}>
+                                <X style={{ width: '1rem', height: '1rem' }} />
+                            </button>
+                            <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem', fontWeight: 'bold' }}>🎬 おすすめ映画</h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.75rem' }}>
+                                {recommendations.movies?.map((movie, idx) => (
+                                    <div key={idx} style={{ background: 'white', padding: '0.5rem 0.6rem', borderRadius: '0.5rem', fontSize: '0.85rem' }}>
+                                        <p style={{ fontWeight: 'bold', margin: '0 0 0.15rem 0' }}>{movie.title} ({movie.year})</p>
+                                        <p style={{ margin: 0, color: '#666' }}>{movie.description}</p>
+                                    </div>
+                                ))}
+                            </div>
+                            <h3 style={{ margin: '0.5rem 0 0.5rem 0', fontSize: '0.95rem', fontWeight: 'bold' }}>📚 おすすめの本</h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                {recommendations.books?.map((book, idx) => (
+                                    <div key={idx} style={{ background: 'white', padding: '0.5rem 0.6rem', borderRadius: '0.5rem', fontSize: '0.85rem' }}>
+                                        <p style={{ fontWeight: 'bold', margin: '0 0 0.15rem 0' }}>{book.title}</p>
+                                        <p style={{ margin: '0 0 0.15rem 0', color: '#666' }}>著者: {book.author}</p>
+                                        <p style={{ margin: 0, color: '#666' }}>{book.description}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 統計バー */}
+                    {watchlist.length > 0 && (
+                        <div style={{ background: 'white', borderRadius: '0.75rem', padding: '0.85rem 1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#475569', marginBottom: '0.4rem' }}>
+                                <span>視聴・読了状況</span>
+                                <span style={{ fontWeight: 600 }}>{watchedCount} / {watchlist.length}（{progressPct}%）</span>
+                            </div>
+                            <div style={{ background: '#e2e8f0', borderRadius: '999px', height: '6px', overflow: 'hidden' }}>
+                                <div style={{ background: 'linear-gradient(90deg, #10b981, #3b82f6)', height: '100%', width: `${progressPct}%`, transition: 'width 0.3s ease' }} />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* フィルターチップ */}
+                    {watchlist.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', gap: '0.4rem', overflowX: 'auto', paddingBottom: '0.2rem' }}>
+                                {typeChips.map(chip => (
+                                    <button key={chip.id} onClick={() => setFilterType(chip.id)} className="chip" style={{
+                                        padding: '0.35rem 0.75rem', borderRadius: '999px', border: '1px solid ' + (filterType === chip.id ? '#3b82f6' : '#e2e8f0'),
+                                        background: filterType === chip.id ? '#3b82f6' : 'white', color: filterType === chip.id ? 'white' : '#475569',
+                                        fontSize: '0.8rem', whiteSpace: 'nowrap', fontWeight: 500
+                                    }}>{chip.label}</button>
+                                ))}
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.4rem' }}>
+                                {[{ id: 'all', label: 'すべて' }, { id: 'unwatched', label: '未視聴/未読' }, { id: 'watched', label: '視聴済み/読了' }].map(chip => (
+                                    <button key={chip.id} onClick={() => setFilterWatched(chip.id)} className="chip" style={{
+                                        padding: '0.3rem 0.65rem', borderRadius: '999px', border: '1px solid ' + (filterWatched === chip.id ? '#10b981' : '#e2e8f0'),
+                                        background: filterWatched === chip.id ? '#ecfdf5' : 'white', color: filterWatched === chip.id ? '#047857' : '#64748b',
+                                        fontSize: '0.75rem', whiteSpace: 'nowrap'
+                                    }}>{chip.label}</button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* リスト本体 */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                        {filteredWatchlist.length === 0 ? (
+                            <div style={{ background: '#f8fafc', borderRadius: '0.75rem', padding: '2rem 1rem', textAlign: 'center', color: '#94a3b8' }}>
+                                <p style={{ margin: 0, fontSize: '1.5rem' }}>🎬📚</p>
+                                <p style={{ margin: '0.5rem 0 0 0' }}>{watchlist.length === 0 ? 'まだアイテムが追加されていません' : '条件に合うアイテムがありません'}</p>
+                            </div>
+                        ) : (
+                            filteredWatchlist.map((item) => {
+                                const canCheckMedia = item.type === 'movie' || item.type === 'anime' || item.type === 'series';
+                                return (
+                                <div key={item.id} className="fade-in card-hover" style={{
+                                    background: 'white', borderRadius: '0.75rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                                    overflow: 'hidden', opacity: item.watched ? 0.65 : 1
+                                }}>
+                                    <div style={{ padding: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flex: 1, minWidth: 0 }}>
+                                            <button onClick={() => toggleWatched(item.id)} style={{
+                                                background: item.watched ? 'linear-gradient(135deg, #10b981, #059669)' : '#e5e7eb',
+                                                border: 'none', borderRadius: '999px', width: '26px', height: '26px', minWidth: '26px', padding: 0,
+                                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', transition: 'all 0.15s'
+                                            }}>
+                                                {item.watched && <Check style={{ width: '14px', height: '14px' }} />}
+                                            </button>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <p style={{ fontWeight: 600, color: '#111827', margin: 0, textDecoration: item.watched ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    {item.title}
+                                                </p>
+                                                <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0 }}>{typeLabel[item.type]} • {item.date}</p>
+                                            </div>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '0.3rem', marginLeft: '0.5rem' }}>
+                                            <button onClick={() => setExpandedItemId(expandedItemId === item.id ? null : item.id)} style={{
+                                                background: '#f1f5f9', border: 'none', borderRadius: '0.4rem', width: '28px', height: '28px', cursor: 'pointer',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center', transform: expandedItemId === item.id ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s'
+                                            }}><ChevronDown style={{ width: '0.9rem', height: '0.9rem' }} /></button>
+                                            <button onClick={() => removeFromWatchlist(item.id)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '0 0.2rem' }}>
+                                                <Trash2 style={{ width: '0.9rem', height: '0.9rem' }} />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {expandedItemId === item.id && (
+                                        <div className="fade-in" style={{ borderTop: '1px solid #f1f5f9', padding: '0.9rem', background: '#fafbfc', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+
+                                            {/* 映画館・サブスク（映画/アニメ/ドラマ） */}
+                                            {canCheckMedia && (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                                        <button onClick={() => searchTheaters(item.title)} style={{
+                                                            display: 'flex', alignItems: 'center', gap: '0.3rem', background: '#fff', border: '1px solid #e2e8f0',
+                                                            borderRadius: '0.5rem', padding: '0.4rem 0.7rem', fontSize: '0.8rem', cursor: 'pointer', color: '#334155', fontWeight: 500
+                                                        }}>
+                                                            <Ticket style={{ width: '0.9rem', height: '0.9rem' }} /> 上映館を探す
+                                                        </button>
+                                                        <button onClick={() => checkSubscription(item)} disabled={loadingSub[item.id]} style={{
+                                                            display: 'flex', alignItems: 'center', gap: '0.3rem', background: '#fff', border: '1px solid #e2e8f0',
+                                                            borderRadius: '0.5rem', padding: '0.4rem 0.7rem', fontSize: '0.8rem', cursor: 'pointer', color: '#334155', fontWeight: 500
+                                                        }}>
+                                                            {loadingSub[item.id] ? <span className="spinner">⏳</span> : <Tv style={{ width: '0.9rem', height: '0.9rem' }} />}
+                                                            配信状況を確認
+                                                        </button>
+                                                    </div>
+
+                                                    {subInfo[item.id] && (
+                                                        <div className="fade-in" style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '0.5rem', padding: '0.7rem' }}>
+                                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.5rem' }}>
+                                                                {subInfo[item.id].platforms && subInfo[item.id].platforms.length > 0 ? (
+                                                                    subInfo[item.id].platforms.map((p, i) => {
+                                                                        const style = platformStyle(p);
+                                                                        return <span key={i} style={{ background: style.bg, color: style.color, fontSize: '0.75rem', fontWeight: 600, padding: '0.25rem 0.6rem', borderRadius: '999px' }}>{p}</span>;
+                                                                    })
+                                                                ) : (
+                                                                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>該当する配信先が見つかりませんでした</span>
+                                                                )}
+                                                            </div>
+                                                            <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '0 0 0.4rem 0', display: 'flex', gap: '0.3rem', alignItems: 'flex-start' }}>
+                                                                <AlertCircle style={{ width: '0.85rem', height: '0.85rem', flexShrink: 0, marginTop: '0.1rem' }} />
+                                                                {subInfo[item.id].note || 'AIによる推定情報です。最新の配信状況は各サービスでご確認ください。'}
+                                                            </p>
+                                                            <button onClick={() => searchSubscriptionWeb(item.title)} style={{
+                                                                background: 'none', border: 'none', color: '#3b82f6', fontSize: '0.78rem', cursor: 'pointer', padding: 0, textDecoration: 'underline'
+                                                            }}>🔍 Web で最新の配信状況を検索</button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* 本の詳細検索 */}
+                                            {item.type === 'book' && (
+                                                <div>
+                                                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem' }}>
+                                                        <input type="text" placeholder="ISBNコードを入力" onChange={(e) => setSearchIsbn(e.target.value)}
+                                                            style={{ flex: 1, padding: '0.45rem 0.6rem', border: '1px solid #e2e8f0', borderRadius: '0.4rem', fontSize: '0.85rem' }} />
+                                                        <button onClick={() => fetchBookInfo(searchIsbn)} disabled={loadingBook[searchIsbn]} style={{
+                                                            background: '#3b82f6', color: 'white', border: 'none', borderRadius: '0.4rem', padding: '0.45rem 0.9rem', cursor: 'pointer', fontSize: '0.85rem'
+                                                        }}>{loadingBook[searchIsbn] ? '⏳' : '検索'}</button>
+                                                    </div>
+                                                    {bookDetails[searchIsbn] && (
+                                                        <div className="fade-in" style={{ background: 'white', padding: '0.7rem', borderRadius: '0.5rem', fontSize: '0.85rem', border: '1px solid #e2e8f0' }}>
+                                                            {bookDetails[searchIsbn].cover && <img src={bookDetails[searchIsbn].cover} alt="cover" style={{ width: '70px', marginBottom: '0.5rem', borderRadius: '0.4rem' }} />}
+                                                            <p style={{ margin: '0.2rem 0', fontWeight: 'bold' }}>{bookDetails[searchIsbn].title}</p>
+                                                            <p style={{ margin: '0.2rem 0', color: '#666' }}>著者: {bookDetails[searchIsbn].author}</p>
+                                                            <p style={{ margin: '0.2rem 0', color: '#666' }}>出版社: {bookDetails[searchIsbn].publisher}</p>
+                                                            <p style={{ margin: '0.2rem 0', color: '#666' }}>出版日: {bookDetails[searchIsbn].pubdate}</p>
+                                                            {bookDetails[searchIsbn].description && <p style={{ margin: '0.4rem 0 0 0', color: '#666', fontSize: '0.8rem', lineHeight: '1.4' }}>{bookDetails[searchIsbn].description}</p>}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
+            );
+
+            // ==================== マップタブ ====================
+            const renderMap = () => (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div className="card-hover" style={{ background: 'white', borderRadius: '0.75rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', padding: '1rem' }}>
+                        <h2 style={{ fontSize: '1.05rem', fontWeight: 'bold', margin: '0 0 0.75rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#1e293b' }}>
+                            <MapPin style={{ width: '1.1rem', height: '1.1rem' }} /> 場所を追加
+                        </h2>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                            <input type="text" value={newPlace} onChange={(e) => setNewPlace(e.target.value)} placeholder="場所の名前"
+                                style={{ padding: '0.6rem 0.75rem', border: '1px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.95rem' }} />
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                                <input type="number" step="0.0001" value={newPlaceLat} onChange={(e) => setNewPlaceLat(e.target.value)} placeholder="緯度"
+                                    style={{ padding: '0.6rem 0.75rem', border: '1px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.95rem' }} />
+                                <input type="number" step="0.0001" value={newPlaceLng} onChange={(e) => setNewPlaceLng(e.target.value)} placeholder="経度"
+                                    style={{ padding: '0.6rem 0.75rem', border: '1px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.95rem' }} />
+                            </div>
+                            <button onClick={addPlace} style={{
+                                background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', fontWeight: 600,
+                                padding: '0.6rem', borderRadius: '0.5rem', border: 'none', cursor: 'pointer'
+                            }}>場所を追加</button>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {places.length === 0 ? (
+                            <div style={{ background: '#f8fafc', borderRadius: '0.75rem', padding: '2rem 1rem', textAlign: 'center', color: '#94a3b8' }}>
+                                <p style={{ margin: 0, fontSize: '1.5rem' }}>📍</p>
+                                <p style={{ margin: '0.5rem 0 0 0' }}>場所がまだ追加されていません</p>
+                            </div>
+                        ) : (
+                            places.map((place) => (
+                                <div key={place.id} onClick={() => togglePlaceSelection(place.id)} className="card-hover" style={{
+                                    borderRadius: '0.75rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', padding: '0.9rem', cursor: 'pointer',
+                                    background: selectedPlaces.includes(place.id) ? '#eff6ff' : 'white',
+                                    border: selectedPlaces.includes(place.id) ? '2px solid #3b82f6' : '1px solid #f1f5f9'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                        <div style={{ flex: 1 }}>
+                                            <p style={{ fontWeight: 600, color: '#111827', margin: 0 }}>{place.name}</p>
+                                            <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0 }}>📍 {place.lat.toFixed(4)}, {place.lng.toFixed(4)}</p>
+                                            {selectedPlaces.includes(place.id) && <p style={{ fontSize: '0.75rem', color: '#2563eb', margin: '0.25rem 0 0 0' }}>✓ AIプランに含める</p>}
+                                        </div>
+                                        <button onClick={(e) => { e.stopPropagation(); removePlace(place.id); }} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                                            <Trash2 style={{ width: '0.9rem', height: '0.9rem' }} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            );
+
+            // ==================== AIプランナータブ ====================
+            const renderPlanner = () => (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ background: 'linear-gradient(135deg, #eff6ff, #faf5ff)', borderRadius: '0.75rem', border: '1px solid #dbeafe', padding: '1rem' }}>
+                        <h2 style={{ fontSize: '1.05rem', fontWeight: 'bold', margin: '0 0 0.4rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#5b21b6' }}>
+                            <Sparkles style={{ width: '1.1rem', height: '1.1rem' }} /> AIトリッププランナー
+                        </h2>
+                        <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>マップから2つ以上の場所を選択してください</p>
+                    </div>
+
+                    {selectedPlaces.length > 0 && (
+                        <div style={{ background: 'white', borderRadius: '0.75rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', padding: '1rem' }}>
+                            <h3 style={{ fontWeight: 600, margin: '0 0 0.6rem 0', fontSize: '0.9rem' }}>選択中の場所 ({selectedPlaces.length})</h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.8rem' }}>
+                                {places.filter((p) => selectedPlaces.includes(p.id)).map((place, idx) => (
+                                    <div key={place.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#374151' }}>
+                                        <span style={{ fontWeight: 'bold', color: '#2563eb' }}>{idx + 1}</span><span>{place.name}</span>
+                                    </div>
+                                ))}
+                            </div>
+                            <button onClick={generateAiPlan} disabled={loadingAi} style={{
+                                width: '100%', background: loadingAi ? '#cbd5e1' : 'linear-gradient(135deg, #3b82f6, #a855f7)', color: 'white',
+                                fontWeight: 'bold', padding: '0.75rem', borderRadius: '0.5rem', border: 'none', cursor: loadingAi ? 'default' : 'pointer',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem'
+                            }}>{loadingAi ? <>⏳ 生成中...</> : <><Sparkles style={{ width: '1rem', height: '1rem' }} /> プランを生成</>}</button>
+                        </div>
+                    )}
+
+                    {aiPlan && (
+                        <div className="fade-in" style={{ background: 'white', borderRadius: '0.75rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+                            <div style={{ background: 'linear-gradient(135deg, #3b82f6, #a855f7)', color: 'white', padding: '1rem' }}>
+                                <h3 style={{ fontSize: '1.15rem', fontWeight: 'bold', margin: 0 }}>{aiPlan.title}</h3>
+                            </div>
+                            <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                                <div>
+                                    <h4 style={{ fontWeight: 600, color: '#111827', margin: '0 0 0.4rem 0', fontSize: '0.9rem' }}>推奨ルート</h4>
+                                    <p style={{ color: '#475569', fontSize: '0.85rem', margin: 0 }}>{aiPlan.recommendation}</p>
+                                </div>
+                                <div>
+                                    <h4 style={{ fontWeight: 600, color: '#111827', margin: '0 0 0.6rem 0', fontSize: '0.9rem' }}>イテラリー</h4>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                                        {aiPlan.itinerary.map((stop, idx) => (
+                                            <div key={idx} style={{ borderLeft: '3px solid #3b82f6', paddingLeft: '0.8rem', paddingTop: '0.3rem', paddingBottom: '0.3rem' }}>
+                                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', marginBottom: '0.2rem', flexWrap: 'wrap' }}>
+                                                    <span style={{ fontWeight: 'bold', fontSize: '1rem', color: '#2563eb' }}>{stop.order}</span>
+                                                    <span style={{ fontWeight: 600, color: '#111827', fontSize: '0.9rem' }}>{stop.place}</span>
+                                                    <span style={{ fontSize: '0.7rem', background: '#dbeafe', color: '#1e40af', padding: '0.1rem 0.45rem', borderRadius: '0.3rem' }}>{stop.stayTime}</span>
+                                                </div>
+                                                <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>{stop.tips}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div style={{ background: '#f8fafc', borderRadius: '0.5rem', padding: '0.7rem' }}>
+                                    <p style={{ fontSize: '0.85rem', color: '#374151', margin: 0 }}><span style={{ fontWeight: 600 }}>⏱ 総所要時間: </span>{aiPlan.totalTime}</p>
+                                </div>
+                                {aiPlan.notes && (
+                                    <div style={{ background: '#fef3c7', borderRadius: '0.5rem', padding: '0.7rem', border: '1px solid #fde68a' }}>
+                                        <p style={{ fontSize: '0.82rem', color: '#78350f', margin: 0 }}>{aiPlan.notes}</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {selectedPlaces.length === 0 && !aiPlan && (
+                        <div style={{ background: '#f8fafc', borderRadius: '0.75rem', padding: '2rem 1rem', textAlign: 'center', color: '#94a3b8' }}>
+                            <p style={{ margin: 0, fontSize: '1.5rem' }}>🗺️</p>
+                            <p style={{ margin: '0.5rem 0 0 0' }}>マップで場所を選択してプランを作成しましょう</p>
+                        </div>
+                    )}
+                </div>
+            );
+
+            return (
+                <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #f8fafc, #eef2f7)' }}>
+                    <div style={{ maxWidth: '56rem', margin: '0 auto', paddingBottom: '80px' }}>
+                        {/* ヘッダー */}
+                        <div style={{ position: 'sticky', top: 0, zIndex: 40, background: 'linear-gradient(135deg, #0f172a, #1e293b)', color: 'white', padding: '1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+                            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <Sparkles style={{ width: '1.3rem', height: '1.3rem' }} /> ウォッチリスト & プランナー
+                            </h1>
+                            <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: '0.2rem 0 0 0' }}>映画・本の管理＆AIトリッププランナー v3.0</p>
+                        </div>
+
+                        {/* タブ */}
+                        <div style={{ position: 'sticky', top: '61px', zIndex: 30, background: 'white', borderBottom: '1px solid #f1f5f9', padding: '0 0.75rem', display: 'flex', gap: '0.2rem', overflowX: 'auto' }}>
+                            {[{ id: 'watchlist', label: 'ウォッチリスト', icon: Film }, { id: 'map', label: 'マップ', icon: MapIcon }, { id: 'planner', label: 'AIプランナー', icon: Sparkles }].map(tab => {
+                                const Icon = tab.icon;
+                                return (
+                                    <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
+                                        padding: '0.7rem 0.9rem', fontWeight: 500, fontSize: '0.85rem', whiteSpace: 'nowrap',
+                                        borderBottom: activeTab === tab.id ? '2px solid #3b82f6' : '2px solid transparent',
+                                        color: activeTab === tab.id ? '#2563eb' : '#64748b', background: 'transparent', border: 'none', cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', gap: '0.3rem', transition: 'color 0.15s'
+                                    }}><Icon style={{ width: '0.9rem', height: '0.9rem' }} />{tab.label}</button>
+                                );
+                            })}
+                        </div>
+
+                        {/* コンテンツ */}
+                        <div style={{ padding: '1rem' }}>
+                            {activeTab === 'watchlist' && renderWatchlist()}
+                            {activeTab === 'map' && renderMap()}
+                            {activeTab === 'planner' && renderPlanner()}
+                        </div>
+                    </div>
+
+                    {/* フッター */}
+                    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', borderTop: '1px solid #f1f5f9', padding: '0.6rem 1rem', textAlign: 'center', fontSize: '0.72rem', color: '#94a3b8', zIndex: 20 }}>
+                        💾 データは自動的に保存されています
+                    </div>
+
+                    {/* トースト通知 */}
+                    <div style={{ position: 'fixed', bottom: '3.2rem', right: '1rem', zIndex: 100, display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
+                        {toasts.map(toast => (
+                            <div key={toast.id} className="toast-in" style={{
+                                background: toast.type === 'error' ? '#ef4444' : toast.type === 'success' ? '#10b981' : '#334155',
+                                color: 'white', padding: '0.6rem 1rem', borderRadius: '0.5rem', fontSize: '0.85rem',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.2)', maxWidth: '280px'
+                            }}>{toast.message}</div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<WatchlistTravelApp />);
+    </script>
+</body>
+</html>
